@@ -1,0 +1,8 @@
+# Media binaries — downloaded locally via scripts/download_drive_media.py
+media/**/*.JPG
+media/**/*.jpg
+media/**/*.MP4
+media/**/*.mp4
+media/**/*.MOV
+media/**/*.mov
+media/download.log
