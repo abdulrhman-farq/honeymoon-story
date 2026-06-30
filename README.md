@@ -27,6 +27,30 @@
 | `analysis/analyze_conversation.py` | محلّل المحادثة الكمّي (يُعاد تشغيله لتحديث التقرير). |
 | `analysis/analysis_report.md` | تقرير الأرقام (مُولَّد آليًّا). |
 | `book/` | فصول الكتاب. |
+| `media/` | صور وفيديوهات الرحلة (تُحمَّل من Google Drive). |
+| `scripts/download_drive_media.py` | سكربت جلب الوسائط من الدرايف. |
+
+## جلب الصور والفيديوهات من Google Drive
+
+**الطريقة السريعة** (تحميل كل مجلد فرعي دفعة واحدة — أسرع بكثير من ملف ملف):
+```bash
+pip install gdown
+export PATH="$HOME/.local/bin:$PATH"
+
+# تحميل كل المجلدات الفرعية (يستأنف تلقائياً الملفات الموجودة)
+python3 scripts/download_drive_media.py
+```
+
+أو يدوياً لمجلد الصور فقط:
+```bash
+gdown --folder --continue \
+  "https://drive.google.com/drive/folders/1eHUjI3DtY8dx9dGTPBhuh4m_Nu0xDPk_" \
+  -O media/
+```
+
+المجلد يحتوي **١٥٢٠ ملفاً**: ١٣٥٧ صورة + ١٦٣ فيديو (٣ مجلدات: `الفديو`، `صور`، `فديو2`).
+
+> **ملاحظة:** التحميل ملف-بملف بطيء جداً بسبب حدود Google Drive. استخدم `--folder --continue` دائماً.
 
 ## تشغيل التحليل الكمّي
 ```bash
