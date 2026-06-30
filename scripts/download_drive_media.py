@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 """
-Fast Google Drive media downloader.
+Google Drive media downloader — two modes:
 
-Strategy: download each subfolder in one gdown call (--folder --continue)
-instead of file-by-file requests. Much faster and avoids rate limits.
+1. fast (default): parallel download of MISSING files only (no re-scan)
+2. folder:         gdown --folder --continue per subfolder
 """
 
 from __future__ import annotations
 
+import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
 
 OUTPUT_DIR = Path("/workspace/media")
-FOLDER_ID = "1OkFMZtF3dJE8xOehDp4avaHJZpJ-rEnM"
-DRIVE_URL = f"https://drive.google.com/drive/folders/{FOLDER_ID}"
+MANIFEST = OUTPUT_DIR / "file_manifest.json"
+MEDIA_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".mp4", ".mov", ".avi", ".mkv"}
 
-# Subfolders inside the main Drive folder
 SUBFOLDERS = [
     ("1kIjnptCcfXCPa38WT03Tfzs3ONbBP7yP", "الفديو"),
     ("1eHUjI3DtY8dx9dGTPBhuh4m_Nu0xDPk_", "صور"),
@@ -25,34 +26,76 @@ SUBFOLDERS = [
 
 
 def count_media() -> int:
-    exts = {".jpg", ".jpeg", ".png", ".mp4", ".mov"}
-    return sum(1 for f in OUTPUT_DIR.rglob("*") if f.is_file() and f.suffix.lower() in exts)
+    return sum(1 for f in OUTPUT_DIR.rglob("*") if f.is_file() and f.suffix.lower() in MEDIA_EXTS)
 
 
-def download_subfolder(folder_id: str, name: str) -> bool:
-    url = f"https://drive.google.com/drive/folders/{folder_id}"
-    dest = OUTPUT_DIR / name
-    dest.mkdir(parents=True, exist_ok=True)
-    print(f"\n=== Downloading: {name} ({folder_id}) ===", flush=True)
-    result = subprocess.run(
-        ["gdown", "--folder", "--continue", url, "-O", str(dest)],
-        text=True,
-    )
-    return result.returncode == 0
+def missing_entries() -> list[dict]:
+    entries = [e for e in json.loads(MANIFEST.read_text()) if Path(e["path"]).suffix.lower() in MEDIA_EXTS]
+    return [e for e in entries if not (OUTPUT_DIR / e["path"]).exists()]
+
+
+def write_jobs(path: Path, entries: list[dict]) -> None:
+    lines = [f"{e['url']}\t{OUTPUT_DIR / e['path']}" for e in entries]
+    path.write_text("\n".join(lines))
+
+
+def download_parallel(jobs_file: Path, workers: int = 8) -> int:
+    cmd = [
+        "parallel",
+        "--colsep", r"\t",
+        "-j", str(workers),
+        "--delay", "0.5",
+        "--joblog", str(OUTPUT_DIR / "parallel.log"),
+        "--resume-failed",
+        "mkdir -p $(dirname {2}) && [ -s {2} ] || gdown {1} -O {2} -q",
+        "::::",
+        str(jobs_file),
+    ]
+    print(f"Running: {' '.join(cmd)}", flush=True)
+    return subprocess.run(cmd).returncode
+
+
+def download_folders() -> int:
+    code = 0
+    for folder_id, name in SUBFOLDERS:
+        dest = OUTPUT_DIR / name
+        dest.mkdir(parents=True, exist_ok=True)
+        url = f"https://drive.google.com/drive/folders/{folder_id}"
+        print(f"\n=== {name} ===", flush=True)
+        result = subprocess.run(["gdown", "--folder", "--continue", url, "-O", str(dest)])
+        if result.returncode != 0:
+            code = 1
+    return code
 
 
 def main() -> int:
-    before = count_media()
-    print(f"Media files before: {before}")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", choices=["fast", "folder"], default="fast")
+    parser.add_argument("--workers", type=int, default=8, help="parallel workers (fast mode)")
+    args = parser.parse_args()
 
-    for folder_id, name in SUBFOLDERS:
-        if not download_subfolder(folder_id, name):
-            print(f"Warning: {name} had errors (may be partial)", flush=True)
+    before = count_media()
+    print(f"Before: {before}/1520")
+
+    if args.mode == "fast":
+        if not MANIFEST.exists():
+            print("Run manifest export first:", file=sys.stderr)
+            print('  gdown --folder --json "FOLDER_URL" -q > media/file_manifest.json', file=sys.stderr)
+            return 1
+        missing = missing_entries()
+        print(f"Missing: {len(missing)}")
+        if not missing:
+            print("All done.")
+            return 0
+        jobs = OUTPUT_DIR / "missing_jobs.tsv"
+        write_jobs(jobs, missing)
+        code = download_parallel(jobs, args.workers)
+    else:
+        code = download_folders()
 
     after = count_media()
-    print(f"\nMedia files after: {after} (+{after - before})")
-    print(f"Expected total: 1520")
-    return 0 if after >= 1520 else 1
+    print(f"\nAfter: {after}/1520 (+{after - before})")
+    return code
 
 
 if __name__ == "__main__":

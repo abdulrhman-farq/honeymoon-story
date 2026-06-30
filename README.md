@@ -32,25 +32,18 @@
 
 ## جلب الصور والفيديوهات من Google Drive
 
-**الطريقة السريعة** (تحميل كل مجلد فرعي دفعة واحدة — أسرع بكثير من ملف ملف):
+**الطريقة الأسرع** (تحميل الناقص فقط — ٨ ملفات بالتوازي):
 ```bash
 pip install gdown
+sudo apt-get install -y parallel   # مرة واحدة
 export PATH="$HOME/.local/bin:$PATH"
 
-# تحميل كل المجلدات الفرعية (يستأنف تلقائياً الملفات الموجودة)
-python3 scripts/download_drive_media.py
+python3 scripts/download_drive_media.py --mode fast --workers 8
 ```
 
-أو يدوياً لمجلد الصور فقط:
-```bash
-gdown --folder --continue \
-  "https://drive.google.com/drive/folders/1eHUjI3DtY8dx9dGTPBhuh4m_Nu0xDPk_" \
-  -O media/
-```
+**أسرع من كل شيء:** من المتصفح → افتح [المجلد](https://drive.google.com/drive/folders/1OkFMZtF3dJE8xOehDp4avaHJZpJ-rEnM) → كليك يمين → **تنزيل** (ZIP واحد).
 
-المجلد يحتوي **١٥٢٠ ملفاً**: ١٣٥٧ صورة + ١٦٣ فيديو (٣ مجلدات: `الفديو`، `صور`، `فديو2`).
-
-> **ملاحظة:** التحميل ملف-بملف بطيء جداً بسبب حدود Google Drive. استخدم `--folder --continue` دائماً.
+المجلد: **١٥٢٠ ملف** (١٣٥٧ صورة + ١٦٣ فيديو).
 
 ## تشغيل التحليل الكمّي
 ```bash
